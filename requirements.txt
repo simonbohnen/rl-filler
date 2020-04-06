@@ -1,0 +1,8 @@
+numpy
+pygame
+gym==0.17.1
+PILLOW
+pyglet==1.5.2
+pyvirtualdisplay
+tensorflow-probability
+tf-agents
