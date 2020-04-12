@@ -2,20 +2,22 @@ import random
 from typing import List, Tuple, Set
 
 import pygame
-from pygame.locals import QUIT, KEYDOWN, K_RETURN, MOUSEBUTTONDOWN
+from pygame.locals import QUIT, KEYDOWN, K_RETURN, MOUSEBUTTONDOWN, K_0, K_1, K_2, K_3, K_4, K_5
 import numpy as np
 
 WIDTH = 8
 HEIGHT = 7
 CELLSIZE = 50
 
-BLACK = (0, 0, 0)
-YELLOW = (255, 255, 0)
-PURPLE = (255, 0, 255)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-RED = (255, 0, 0)
-COLORS = (BLACK, YELLOW, PURPLE, GREEN, BLUE, RED)
+BLACK = (60, 60, 60)
+YELLOW = (251, 224, 79)
+PURPLE = (102, 79, 158)
+GREEN = (166, 203, 97)
+BLUE = (82, 166, 237)
+RED = (229, 72, 88)
+COLORS = [BLACK, YELLOW, PURPLE, GREEN, BLUE, RED]
+COLOR_KEYS = [K_0, K_1, K_2, K_3, K_4, K_5]
+COLOR_NAMES = ["black", "yellow", "purple", "green", "blue", "red"]
 
 '''
 Data:
@@ -73,7 +75,7 @@ class PlayerState:
 
 
 class FillerState:
-    def __init__(self, board, starting_player):
+    def __init__(self, board, starting_player, quiet=True):
         self.board = board
         # 1 is player in bottom left corner (0, HEIGHT - 1), 2 is player in top right corner (WIDTH - 1, 0)
         self.player = starting_player
@@ -83,11 +85,22 @@ class FillerState:
         self.available[0][HEIGHT - 1] = False
         self.available[WIDTH - 1][0] = False
         self.is_final_state = False
+        self.move_count = 0
+        self.quiet = quiet
+        self.last_move_illegal = False
 
     def move(self, color):
-        if color == self.board[WIDTH - 1][0] or color == self.board[0][HEIGHT - 1]:
-            print("Can't choose color %d" % color)
-            return False
+        self.move_count += 1
+        self.last_move_illegal = False
+
+        # Determine whether move was illegal
+        player1_color = self.board[0][HEIGHT - 1]
+        player2_color = self.board[WIDTH - 1][0]
+        if color == player1_color or color == player2_color:
+            color = random_color_exluding([player1_color, player2_color])
+            if not self.quiet:
+                print("Illegal move by player %d: %s." % (self.player, COLOR_NAMES[color]))
+            self.last_move_illegal = True
 
         if self.player == 1:
             # Bottom left player
@@ -101,7 +114,7 @@ class FillerState:
             self.player = 1
         if self.player1State.score + self.player2State.score == WIDTH * HEIGHT:
             self.is_final_state = True
-        return True
+        return len(new_owned)
 
     def do_standard_move(self):
         if self.player == 1:
@@ -127,10 +140,12 @@ class FillerState:
         ran = random.random()
         adjacent_colors.discard(greedy_color)
         if ran < 0.7 or not adjacent_colors:
-            print("Chose greedy color (could be random)")
+            if not self.quiet:
+                print("Chose greedy color (could be random)")
             self.move(greedy_color)
         else:
-            print("Chose random adjacent color")
+            if not self.quiet:
+                print("Chose random adjacent color")
             self.move(random.choice(list(adjacent_colors)))
 
 
@@ -196,10 +211,14 @@ def board_like_on_screen(board):
     return list(map(list, zip(*board)))
 
 
+def print_colors():
+    for i in range(len(COLORS)):
+        print("Color %d: %s" % (i, COLOR_NAMES[i]))
+
 # Board [x][y], transpose at \
 
 
-def main():
+def main(policy=None):
     # Initialize Everything
     pygame.init()
     screen = pygame.display.set_mode((400, 350))
@@ -221,6 +240,7 @@ def main():
 
     draw_board(board, background)
     print(str_board(board))
+    print_colors()
 
     while running:
         clock.tick(60)
@@ -229,30 +249,43 @@ def main():
         for event in pygame.event.get():
             if event.type == QUIT:
                 running = False
-            elif initing and event.type == KEYDOWN and event.key == K_RETURN:
-                color += 1
-                if color == len(COLORS):
-                    initing = False
-                    state = FillerState(board, 1)
+            elif event.type == KEYDOWN:
+                if initing and event.key == K_RETURN:
+                    color += 1
+                    if color == len(COLORS):
+                        initing = False
+                        state = FillerState(board, 1)
+                if event.key in COLOR_KEYS:
+                    color = COLOR_KEYS.index(event.key)
+                    state.move(color)
+                    if not state.is_final_state:
+                        state.do_standard_move()
+                    if state.is_final_state:
+                        print("Finished game. Player 1 scored %d, player 2 scored %d."
+                              % (state.player1State.score, state.player2State.score))
+                        board = get_random_regular_board()
+                        state = FillerState(board, 1)
             elif event.type == MOUSEBUTTONDOWN:
                 if initing:
                     set_color(board, pygame.mouse.get_pos(), color)
                 else:
-                    if state.move(get_color(state.board, pygame.mouse.get_pos())) and not state.is_final_state:
+                    state.move(get_color(state.board, pygame.mouse.get_pos()))
+                    if not state.is_final_state:
+                        if policy:
+                            state.move(policy.action())
                         state.do_standard_move()
                     if state.is_final_state:
-                        print("Finished game. Player 1 scored %d, player 2 scored %d." % (state.player1State.score, state.player2State.score))
+                        print("Finished game. Player 1 scored %d, player 2 scored %d."
+                              % (state.player1State.score, state.player2State.score))
                         board = get_random_regular_board()
                         state = FillerState(board, 1)
 
-                draw_board(board, background)
-        # Draw Everything
+        draw_board(board, background)
         screen.blit(background, (0, 0))
         pygame.display.flip()
 
     pygame.quit()
 
 
-# this calls the 'main' function when this script is executed
 if __name__ == '__main__':
     main()

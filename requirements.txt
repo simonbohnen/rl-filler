@@ -1,3 +1,4 @@
+tensorflow
 numpy
 pygame
 gym==0.17.1
