@@ -18,7 +18,7 @@ from tf_agents.trajectories import time_step as ts
 from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
 
-from filler import FillerState, get_random_regular_board
+from filler import FillerState, get_random_regular_board, COLORS, WIDTH, HEIGHT
 
 num_iterations = 2000000
 
@@ -38,14 +38,16 @@ class FillerEnvironment(py_environment.PyEnvironment):
     def __init__(self):
         super().__init__()
         self._action_spec = array_spec.BoundedArraySpec(
-            shape=(), dtype=np.int32, minimum=0, maximum=5, name='action')
+            shape=(), dtype=np.int32, minimum=0, maximum=3, name='action')
         self._observation_spec = array_spec.BoundedArraySpec(
             shape=(8, 7), dtype=np.int32, minimum=0, maximum=5, name='observation')
         self._episode_ended = False
         self.state = None
-        self.reset_state()
         self.total_score = 1
         self.rewards = []
+        self.regularized_board = np.zeros(shape=(8, 7), dtype=np.int32)
+        self.mapping = []
+        self.reset_state()
 
     def action_spec(self):
         return self._action_spec
@@ -62,8 +64,8 @@ class FillerEnvironment(py_environment.PyEnvironment):
             reward = -1
             self._episode_ended = True
         else:
-            new_owned_count = self.state.move(action)
-            if self.state.last_move_illegal:
+            new_owned_count = self.state.move(self.mapping.index(action))
+            if self.state.last_move_illegal or new_owned_count == 0:
                 reward = -1
             else:
                 reward = new_owned_count
@@ -80,11 +82,32 @@ class FillerEnvironment(py_environment.PyEnvironment):
                 # print(self.total_score)
 
         self.rewards.append(reward)
+        self.update_mapping()
+        self.regularize_board()
         if self._episode_ended:
-            return ts.termination(self.state.board, reward)
+            return ts.termination(self.regularized_board, reward)
         else:
             # TODO was fürn discount?
-            return ts.transition(self.state.board, reward, 0.7)
+            return ts.transition(self.regularized_board, reward, 0.7)
+
+    def update_mapping(self):
+        self.mapping = list(range(len(COLORS)))
+        board = self.state.board
+        player1_color = board[0][HEIGHT-1]
+        player2_color = board[WIDTH-1][0]
+        self.mapping[player1_color] = 4
+        self.mapping[4] = player1_color
+        player2_mapping = self.mapping[player2_color]
+        five_index = self.mapping.index(5)
+        self.mapping[player2_color] = 5
+        self.mapping[five_index] = player2_mapping
+
+    # Transforms the board colors such that the players have the colors 4 and 5.
+    def regularize_board(self):
+        for x in range(WIDTH):
+            for y in range(HEIGHT):
+                self.regularized_board[x][y] = self.mapping[self.state.board[x][y]]
+        # self.regularized_board = np.array([[self.mapping[color] for color in column] for column in self.state.board])
 
     def reset_state(self):
         self.total_score = 1
@@ -93,11 +116,13 @@ class FillerEnvironment(py_environment.PyEnvironment):
         self.state = FillerState(get_random_regular_board(), first_player)
         if first_player == 2:
             self.state.move(random.randint(0, 5))  # do_standard_move()
+        self.update_mapping()
+        self.regularize_board()
 
     def _reset(self):
         self._episode_ended = False
         self.reset_state()
-        return ts.restart(self.state.board)
+        return ts.restart(self.regularized_board)
 
     def get_info(self):
         # No idea what I should do here
