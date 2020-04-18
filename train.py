@@ -65,8 +65,9 @@ class FillerEnvironment(py_environment.PyEnvironment):
             self._episode_ended = True
         else:
             new_owned_count = self.state.move(self.mapping.index(action))
-            if self.state.last_move_illegal or new_owned_count == 0:
+            if self.state.last_move_illegal:
                 reward = -1
+                print("Illegal move!")
             else:
                 reward = new_owned_count
             self.total_score += new_owned_count
@@ -75,7 +76,12 @@ class FillerEnvironment(py_environment.PyEnvironment):
             if self.state.is_final_state:
                 self._episode_ended = True
                 if self.total_score > 28:
-                    reward += 10
+                    # print("Won!")
+                    pass
+                    # reward += 10
+                elif self.total_score < 28:
+                    pass
+                    # print("Lost!")
                 # elif self.total_score < 28:
                 #     reward -= 10
                 # print(str_board(self.state.board))

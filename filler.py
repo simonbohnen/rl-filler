@@ -42,7 +42,6 @@ class PlayerState:
         self.adjacents: List[Cellset] = [set() for _ in range(6)]
         self.score: int = 1
         self.owned: Cellset = set()
-        self.enclaves: Cellset = set()
         if isplayer1:
             self.owned.add((0, HEIGHT - 1))
             self.adjacents[board[0][HEIGHT - 2]].add((0, HEIGHT - 2))
@@ -52,19 +51,31 @@ class PlayerState:
             self.adjacents[board[WIDTH - 1][1]].add((WIDTH - 1, 1))
             self.adjacents[board[WIDTH - 2][0]].add((WIDTH - 2, 0))
 
-    def move(self, board: Board, color: int, is_available: Field):
+    # Returns set of newly owned cells that are not enclaves
+    def move(self, board: Board, color: int, is_available: Field, owned_by_other: Cellset, quiet=True):
         for x, y in self.owned:
             board[x][y] = color
 
         self.owned |= self.adjacents[color]
         self.score += len(self.adjacents[color])
-        self.enclaves -= self.adjacents[color]
+        if not quiet:
+            print("Added %d adjacents" % len(self.adjacents[color]))
         new_owned: Cellset = self.adjacents[color]
-        for x, y, in new_owned:
+        for x, y in new_owned:
             is_available[x][y] = False
         self.adjacents[color] = set()
-
         self.update_adjacents(board, new_owned, is_available)
+
+        enclaves = self.get_enclaves(owned_by_other)
+        for x, y in enclaves:
+            board[x][y] = color
+            is_available[x][y] = False
+        self.score += len(enclaves)
+        if not quiet:
+            print("Added %d enclaves" % len(enclaves))
+        self.owned |= enclaves
+        for c in range(len(COLORS)):
+            self.adjacents[c] -= enclaves
         return new_owned
 
     def update_adjacents(self, board: Board, new_owned: Cellset, is_available: Field):
@@ -82,7 +93,7 @@ class PlayerState:
             self.adjacents[c] -= new_owned
 
     def __explore_cell(self, x: int, y: int, owned_by_other: Cellset,
-                       open_cells: List[Point], checked: Field, possible_enclaves: Cellset):
+                       open_cells: List[Point], checked: Field, possible_enclaves: Cellset, enclaves):
         # noinspection PyShadowingBuiltins
         open = 0
         possible = 1
@@ -93,7 +104,7 @@ class PlayerState:
         if not 0 <= x < WIDTH or not 0 <= y < HEIGHT or pos in self.owned:
             # Out of bounds or own cell.
             return owned
-        if pos in self.enclaves:
+        if pos in enclaves:
             # Is already enclave, don't need to explore.
             return
         if pos in owned_by_other or pos in open_cells:
@@ -106,7 +117,7 @@ class PlayerState:
         # Explore.
         neighbors = [(x+1, y), (x, y-1), (x-1, y), (x, y+1)]
         for nx, ny in neighbors:
-            result = self.__explore_cell(nx, ny, owned_by_other, open_cells, checked, possible_enclaves)
+            result = self.__explore_cell(nx, ny, owned_by_other, open_cells, checked, possible_enclaves, enclaves)
             if result == owned or result == possible:
                 # Neighbor is out of bounds or has been checked already.
                 continue
@@ -118,14 +129,16 @@ class PlayerState:
         possible_enclaves.add(pos)
         return possible
 
-    def update_enclaves(self, owned_by_other):
+    def get_enclaves(self, owned_by_other):
         open_cells = []
+        enclaves: Cellset = set()
         for c in range(len(COLORS)):
             for x, y in self.adjacents[c]:
                 possible_enclaves: Cellset = set()
                 self.__explore_cell(x, y, owned_by_other, open_cells,
-                                    [[False for _ in range(HEIGHT)] for _ in range(WIDTH)], possible_enclaves)
-                self.enclaves |= possible_enclaves
+                                    [[False for _ in range(HEIGHT)] for _ in range(WIDTH)], possible_enclaves, enclaves)
+                enclaves |= possible_enclaves
+        return enclaves
 
 
 class FillerState:
@@ -158,21 +171,25 @@ class FillerState:
 
         if self.player == 1:
             # Bottom left player
-            new_owned = self.player1State.move(self.board, color, self.is_available)
+            old_score = self.player1State.score
+            new_owned = self.player1State.move(self.board, color, self.is_available,
+                                               self.player2State.owned)
             self.player2State.remove_new_owned_from_adjacents(new_owned)
-            self.player1State.update_enclaves(self.player2State.owned)
             self.player = 2
+            score_diff = self.player1State.score - old_score
+            if not self.quiet:
+                print("Scored %d points. Score is now %d." % (score_diff, self.player1State.score))
         else:
             # Top right player
-            new_owned = self.player2State.move(self.board, color, self.is_available)
+            old_score = self.player1State.score
+            new_owned = self.player2State.move(self.board, color, self.is_available, self.player1State.owned)
             self.player1State.remove_new_owned_from_adjacents(new_owned)
-            self.player2State.update_enclaves(self.player1State.owned)
             self.player = 1
-        if \
-                self.player1State.score + len(self.player1State.enclaves) + \
-                self.player2State.score + len(self.player2State.enclaves) == WIDTH * HEIGHT:
+            score_diff = self.player1State.score - old_score
+
+        if self.player1State.score + self.player2State.score == WIDTH * HEIGHT:
             self.is_final_state = True
-        return len(new_owned)
+        return score_diff
 
     def do_standard_move(self):
         if self.player == 1:
