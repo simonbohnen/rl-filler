@@ -1,4 +1,5 @@
 .idea/
 excluded.txt
+status.txt
 venv/
 __pycache__/

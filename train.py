@@ -34,6 +34,8 @@ num_eval_episodes = 10
 eval_interval = 1000
 
 
+# Tutorial on how to build a custom environment:
+# https://github.com/tensorflow/agents/blob/master/docs/tutorials/2_environments_tutorial.ipynb
 class FillerEnvironment(py_environment.PyEnvironment):
     def __init__(self):
         super().__init__()
@@ -47,7 +49,7 @@ class FillerEnvironment(py_environment.PyEnvironment):
         self.rewards = []
         self.regularized_board = np.zeros(shape=(8, 7), dtype=np.int32)
         self.mapping = []
-        self.reset_state()
+        self.__reset_state()
 
     def action_spec(self):
         return self._action_spec
@@ -56,6 +58,11 @@ class FillerEnvironment(py_environment.PyEnvironment):
         return self._observation_spec
 
     def _step(self, action):
+        """
+        Performs the action as a move on the board.
+        :param action: the move to perform, a color from 0-4 referring to the REGULARIZED board.
+        :return: the next time_step.
+        """
         if self._episode_ended:
             return self.reset()
 
@@ -64,6 +71,7 @@ class FillerEnvironment(py_environment.PyEnvironment):
             reward = -1
             self._episode_ended = True
         else:
+            # We need to map to the normal colors using the reverse mapping.
             new_owned_count = self.state.move(self.mapping.index(action))
             if self.state.last_move_illegal:
                 reward = -1
@@ -88,15 +96,18 @@ class FillerEnvironment(py_environment.PyEnvironment):
                 # print(self.total_score)
 
         self.rewards.append(reward)
-        self.update_mapping()
-        self.regularize_board()
+        self.__update_mapping()
+        self.__regularize_board()
         if self._episode_ended:
             return ts.termination(self.regularized_board, reward)
         else:
             # TODO was fürn discount?
             return ts.transition(self.regularized_board, reward, 0.7)
 
-    def update_mapping(self):
+    def __update_mapping(self):
+        """
+        updates the mapping from the normal board to the rgularized board according to the new player colors.
+        """
         self.mapping = list(range(len(COLORS)))
         board = self.state.board
         player1_color = board[0][HEIGHT-1]
@@ -108,26 +119,32 @@ class FillerEnvironment(py_environment.PyEnvironment):
         self.mapping[player2_color] = 5
         self.mapping[five_index] = player2_mapping
 
-    # Transforms the board colors such that the players have the colors 4 and 5.
-    def regularize_board(self):
+    def __regularize_board(self):
+        """
+        Transforms the board colors such that the players have the colors 4 and 5.
+        This is done after the mapping has been updated.
+        """
         for x in range(WIDTH):
             for y in range(HEIGHT):
                 self.regularized_board[x][y] = self.mapping[self.state.board[x][y]]
         # self.regularized_board = np.array([[self.mapping[color] for color in column] for column in self.state.board])
 
-    def reset_state(self):
+    def __reset_state(self):
+        """
+        resets the state by getting a fresh random board and updating the mapping and regularized board.
+        """
         self.total_score = 1
         self.rewards = []
         first_player = 1  # random.randint(1, 2)
         self.state = FillerState(get_random_regular_board(), first_player)
         if first_player == 2:
             self.state.move(random.randint(0, 5))  # do_standard_move()
-        self.update_mapping()
-        self.regularize_board()
+        self.__update_mapping()
+        self.__regularize_board()
 
     def _reset(self):
         self._episode_ended = False
-        self.reset_state()
+        self.__reset_state()
         return ts.restart(self.regularized_board)
 
     def get_info(self):
@@ -174,6 +191,7 @@ def collect_data(env, policy, buffer, steps):
 
 
 if __name__ == "__main__":
+    # Got large parts of this from https://github.com/tensorflow/agents/blob/master/docs/tutorials/1_dqn_tutorial.ipynb
     valenv = FillerEnvironment()
     utils.validate_py_environment(valenv)
     print("\nEverything ok.")
