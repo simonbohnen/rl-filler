@@ -18,7 +18,8 @@ from tf_agents.trajectories import time_step as ts
 from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
 
-from filler import FillerState, get_random_regular_board, COLORS, WIDTH, HEIGHT
+from helpers import get_random_regular_board, COLORS, WIDTH, HEIGHT
+from fillerstate import FillerState
 
 num_iterations = 2000000
 
