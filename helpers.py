@@ -25,7 +25,7 @@ def draw_board(board, surface):
         for y in range(HEIGHT):
             color = board[x][y]
             if not color == -1:
-                pygame.draw.rect(surface, COLORS[board[x][y]],
+                pygame.draw.rect(surface, COLORS[color],
                                  pygame.Rect(CELLSIZE * x, CELLSIZE * y, CELLSIZE, CELLSIZE))
 
 
