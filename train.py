@@ -76,7 +76,7 @@ class FillerEnvironment(py_environment.PyEnvironment):
             new_owned_count = self.state.move(self.mapping.index(action))
             if self.state.last_move_illegal:
                 reward = -1
-                print("Illegal move!")
+                print("INFO: Illegal move!")
             else:
                 reward = new_owned_count
             self.total_score += new_owned_count

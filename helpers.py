@@ -16,7 +16,7 @@ def get_color(board, mousepos):
     y = mousepos[1] // CELLSIZE
     if x >= WIDTH or y >= HEIGHT:
         return
-    print("Clicked on cell: %d, %d" % (x, y))
+    print("INFO: Clicked on cell: %d, %d" % (x, y))
     return board[x][y]
 
 
@@ -31,6 +31,7 @@ def draw_board(board, surface):
 
 def random_color_exluding(exclude=None):
     if exclude is None:
+        # To prevent mutability of `exclude`
         exclude = []
     color = random.randrange(len(COLORS))
     while color in exclude:

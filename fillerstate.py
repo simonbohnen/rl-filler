@@ -41,10 +41,11 @@ class FillerState:
             oldcolor = color
             color = random_color_exluding([player1_color, player2_color])
             if not self.quiet:
-                print("Illegal move by player %d: %s. Chose %s randomly."
+                print("INFO: Illegal move by player %d: %s. Chose %s randomly."
                       % (self.player, COLOR_NAMES[oldcolor], COLOR_NAMES[color]))
             self.last_move_illegal = True
 
+        print(f"MOVE: Player {self.player} chose {COLOR_NAMES[color]}.")
         if self.player == 1:
             # Bottom left player
             old_score = self.player1State.score
@@ -54,16 +55,21 @@ class FillerState:
             self.player = 2
             score_diff = self.player1State.score - old_score
             if not self.quiet:
-                print("Scored %d points. Score is now %d." % (score_diff, self.player1State.score))
+                print("INFO: Player 1 scored %d points. Score is now %d." % (score_diff, self.player1State.score))
         else:
             # Top right player
-            old_score = self.player1State.score
+            old_score = self.player2State.score
             new_owned = self.player2State.move(self.board, color, self.is_available, self.player1State.owned)
             self.player1State.remove_new_owned_from_adjacents(new_owned)
             self.player = 1
-            score_diff = self.player1State.score - old_score
+            score_diff = self.player2State.score - old_score
+            if not self.quiet:
+                print("INFO: Player 2 scored %d points. Score is now %d." % (score_diff, self.player2State.score))
 
-        if self.player1State.score + self.player2State.score == WIDTH * HEIGHT:
+        area = WIDTH * HEIGHT
+        if self.player1State.score > area / 2 or \
+                self.player2State.score > area / 2 or \
+                self.player1State.score + self.player2State.score == area:
             self.is_final_state = True
         return score_diff
 
@@ -95,9 +101,9 @@ class FillerState:
         adjacent_colors.discard(greedy_color)
         if ran < 0.7 or not adjacent_colors:
             if not self.quiet:
-                print("Chose greedy color (could be random)")
+                print("INFO: Chose greedy color (could be random)")
             self.move(greedy_color)
         else:
             if not self.quiet:
-                print("Chose random adjacent color")
+                print("INFO: Chose random adjacent color")
             self.move(random.choice(list(adjacent_colors)))

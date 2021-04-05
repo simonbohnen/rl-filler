@@ -41,18 +41,18 @@ def main(policy=None):
                     color += 1
                     if color == len(COLORS):
                         initing = False
-                        state = FillerState(board, 1)
+                        state = FillerState(board, 1, False)
                 if event.key in COLOR_KEYS:
                     # perform move using number keys
-                    color = COLOR_KEYS.index(event.key)
+                    color = COLOR_KEYS.index(event.key) % 6
                     state.move(color)
                     if not state.is_final_state:
                         state.do_standard_move()
                     if state.is_final_state:
-                        print("Finished game. Player 1 scored %d, player 2 scored %d."
+                        print("END: Finished game. Player 1 scored %d, player 2 scored %d."
                               % (state.player1State.score, state.player2State.score))
                         board = get_random_regular_board()
-                        state = FillerState(board, 1)
+                        state = FillerState(board, 1, False)
             elif event.type == MOUSEBUTTONDOWN:
                 if initing:
                     # set color of board
@@ -65,10 +65,10 @@ def main(policy=None):
                             state.move(policy.action())
                         state.do_standard_move()
                     if state.is_final_state:
-                        print("Finished game. Player 1 scored %d, player 2 scored %d."
+                        print("END: Finished game. Player 1 scored %d, player 2 scored %d."
                               % (state.player1State.score, state.player2State.score))
                         board = get_random_regular_board()
-                        state = FillerState(board, 1)
+                        state = FillerState(board, 1, False)
 
         draw_board(board, background)
         screen.blit(background, (0, 0))
