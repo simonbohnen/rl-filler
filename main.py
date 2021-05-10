@@ -47,7 +47,7 @@ def main(policy=None):
                     color = COLOR_KEYS.index(event.key) % 6
                     state.move(color)
                     if not state.is_final_state:
-                        state.do_standard_move()
+                        state.do_alpha_move()
                     if state.is_final_state:
                         print("END: Finished game. Player 1 scored %d, player 2 scored %d."
                               % (state.player1State.score, state.player2State.score))
@@ -63,7 +63,7 @@ def main(policy=None):
                     if not state.is_final_state:
                         if policy:
                             state.move(policy.action())
-                        state.do_standard_move()
+                        state.do_alpha_move()
                     if state.is_final_state:
                         print("END: Finished game. Player 1 scored %d, player 2 scored %d."
                               % (state.player1State.score, state.player2State.score))

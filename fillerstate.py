@@ -2,7 +2,11 @@ from defs import *
 from playerstate import PlayerState
 from helpers import random_color_exluding
 import random
+import sys
+import copy
 
+neginf = sys.float_info.min
+inf = sys.float_info.max
 
 class FillerState:
     def __init__(self, board: Board, starting_player: int, quiet: bool = True):
@@ -23,6 +27,7 @@ class FillerState:
         self.is_final_state = False
         self.move_count = 0
         self.quiet = quiet
+        self.deadquiet = False
         self.last_move_illegal = False
 
     def move(self, color: int) -> int:
@@ -45,7 +50,9 @@ class FillerState:
                       % (self.player, COLOR_NAMES[oldcolor], COLOR_NAMES[color]))
             self.last_move_illegal = True
 
-        print(f"MOVE: Player {self.player} chose {COLOR_NAMES[color]}.")
+        if not self.deadquiet:
+            print(f"MOVE: Player {self.player} chose {COLOR_NAMES[color]}.")
+
         if self.player == 1:
             # Bottom left player
             old_score = self.player1State.score
@@ -88,7 +95,7 @@ class FillerState:
         greedy_color = random_color_exluding([player1_color, player2_color])
         adjacent_colors = set()
 
-        valid_colors = (c for c in range(len(COLORS)) if c != player1_color and c != player2_color)
+        valid_colors = (c for c in range(COLORCOUNT) if c != player1_color and c != player2_color)
         for color in valid_colors:
             adjacent_count = len(current_state.adjacents[color])
             if adjacent_count > 0:
@@ -107,3 +114,74 @@ class FillerState:
             if not self.quiet:
                 print("INFO: Chose random adjacent color")
             self.move(random.choice(list(adjacent_colors)))
+
+    def do_alpha_move(self):
+        quietcopy = copy.deepcopy(self)
+        quietcopy.quiet = True
+        quietcopy.deadquiet = True
+        (bestcolor, sc) = quietcopy.a_star_search(7)
+        self.move(bestcolor)
+
+    def a_star_search(self, depth):
+        return self.a_star_search_rec(depth, neginf, inf)
+
+    def a_star_search_rec(self, depth, alpha, beta):
+        """
+        A star search.
+        Player 1 is maximizing, player 2 is minimizing.
+        :param depth: the depth.
+        :param alpha:
+        :param beta:
+        """
+        if depth == 0 or self.is_final_state:
+            return -1, self.heuristic()
+
+        if self.player == 1:
+            value = neginf
+            state = self.player1State
+            colors = [color for color in range(COLORCOUNT) if len(state.adjacents[color]) != 0]
+            try:
+                colors.remove(self.board[WIDTH - 1][0])
+            except ValueError:
+                pass
+            colors.sort(key=lambda c: len(state.adjacents[c]))
+
+            bestcolor = 0
+            for color in colors:
+                # Copy state
+                newstate = copy.deepcopy(self)
+                newstate.move(color)
+                (bc, newval) = newstate.a_star_search_rec(depth - 1, alpha, beta)
+                if newval > value:
+                    value = newval
+                    bestcolor = color
+                alpha = max(alpha, value)
+                if alpha >= beta:
+                    break
+            return bestcolor, value
+        else:
+            value = inf
+            state = self.player2State
+            colors = [color for color in range(COLORCOUNT) if len(state.adjacents[color]) != 0]
+            try:
+                colors.remove(self.board[0][HEIGHT - 1])
+            except ValueError:
+                pass
+            colors.sort(key=lambda c: len(state.adjacents[c]))
+
+            bestcolor = 0
+            for color in colors:
+                # Copy state
+                newstate = copy.deepcopy(self)
+                newstate.move(color)
+                (bc, newval) = newstate.a_star_search_rec(depth - 1, alpha, beta)
+                if newval < value:
+                    value = newval
+                    bestcolor = color
+                beta = max(beta, value)
+                if beta <= alpha:
+                    break
+            return bestcolor, value
+
+    def heuristic(self):
+        return self.player1State.score - self.player2State.score
